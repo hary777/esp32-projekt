@@ -90,6 +90,9 @@ static void initialise_wifi(void)
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
     ESP_ERROR_CHECK( esp_wifi_start() );
+    
+    ESP_LOGI(TAG, "Zapnuti sleepu");
+    esp_wifi_set_ps( WIFI_PS_MODEM );
 }
 
 static void http_get_task(void *pvParameters)
@@ -152,6 +155,10 @@ static void http_get_task(void *pvParameters)
             continue;
         }
         ESP_LOGI(TAG, "... socket send success");
+        
+        
+        ESP_LOGI(TAG, "Zapnuti sleepu");
+    esp_wifi_set_ps( WIFI_PS_MODEM );
 
         /* Read HTTP response */
         do {
@@ -160,7 +167,12 @@ static void http_get_task(void *pvParameters)
             for(int i = 0; i < r; i++) {
                 putchar(recv_buf[i]);
             }
+            
+            
         } while(r > 0);
+        
+        ESP_LOGI(TAG, "Zapnuti sleepu");
+    esp_wifi_set_ps( WIFI_PS_MODEM );
 
         ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d\r\n", r, errno);
         close(s);
@@ -174,7 +186,7 @@ static void http_get_task(void *pvParameters)
 
 void app_main()
 {
-
+int prom;
 	// Initialize NVS.
 	    esp_err_t err = nvs_flash_init();
 	    if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -193,12 +205,19 @@ void app_main()
 
 
     //nvs_flash_init();
-    //initialise_wifi();
+    initialise_wifi();
     //xTaskCreate(&http_get_task, "http_get_task", 2048, NULL, 5, NULL);
-		//ESP_LOGI(TAG, "Starting again!");
+		ESP_LOGI(TAG, "Starting again!");
+		
+		ESP_LOGI(TAG, "Zapnuti sleepu");
+    esp_wifi_set_ps( WIFI_PS_MODEM );
 
-		while(1){
-			vTaskDelay(1000 / portTICK_PERIOD_MS);
-			printf("%s\n", "test");
-		}
+
+while(1){
+						vTaskDelay(3000 / portTICK_PERIOD_MS);
+						printf("%s\n", "tick");
+						ESP_LOGI(TAG, "Zapnuti sleepu");
+    esp_wifi_set_ps( WIFI_PS_MODEM );
+					}
+		
 }
