@@ -33,3 +33,6 @@
 [submodule "components/spiffs/spiffs"]
 	path = components/spiffs/spiffs
 	url = https://github.com/pellepl/spiffs.git
+[submodule "components/espmqtt"]
+	path = components/espmqtt
+	url = https://github.com/tuanpmt/espmqtt.git
