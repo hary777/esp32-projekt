@@ -1,3 +1,2 @@
 #!/bin/bash
-make flash
-make monitor #stop CTRL+]
+make flash && make monitor #stop CTRL+]
