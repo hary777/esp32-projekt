@@ -14,7 +14,11 @@
 #include "lwip/netdb.h"
 #include "lwip/dns.h"
 
+#include "driver/gpio.h"
+
 #include "mqtt_client.h"
+
+
 
 /* The examples use simple WiFi configuration that you can set via
 #define WIFI_SSID "mywifissid"
@@ -31,7 +35,7 @@ static EventGroupHandle_t wifi_event_group;
 const int CONNECTED_BIT = BIT0;
 
 
-static const char *TAG = "example";
+static const char *TAG = "projekt_multisensor";
 
 
 
@@ -83,7 +87,7 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
 {
     esp_mqtt_client_handle_t client = event->client;
     int msg_id;
-    // your_context_t *context = event->context;
+
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
@@ -95,6 +99,9 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
 
             msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
             ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
+
+            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
+            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -129,7 +136,6 @@ static void mqtt_app_start(void)
         //.uri = "mqtt://iot.eclipse.org",
         .host = "192.168.88.7",
         .event_handle = mqtt_event_handler,
-        // .user_context = (void *)your_context
     };
 
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
@@ -137,11 +143,43 @@ static void mqtt_app_start(void)
 
 
 
+
+
+    gpio_config_t gpio_cfg = {
+		.pin_bit_mask = GPIO_SEL_16,
+		.mode = GPIO_MODE_OUTPUT,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE
+	};
+	ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
+
+	gpio_cfg.pin_bit_mask = GPIO_SEL_15;
+	ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
+
+
+	int cnt=0;
     while(1){
     	vTaskDelay(5000 / portTICK_PERIOD_MS);
 
+		printf("%s\n","posilam teplotu");
     	esp_mqtt_client_publish(client, "home/room/temp", "20", 2, 0, 0);
+
+    	if(cnt){
+			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,0) );
+			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_15,1) );
+			cnt = 0;
+    	}
+		else{
+			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,1) );
+			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_15,0) );
+			cnt = 1;
+		}
 	}
+
+
+
+
 
 }
 
