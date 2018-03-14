@@ -18,6 +18,8 @@
 
 #include "mqtt_client.h"
 
+#include "dht11.h"
+
 
 
 /* The examples use simple WiFi configuration that you can set via
@@ -154,8 +156,8 @@ static void mqtt_app_start(void)
 	};
 	ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
 
-	gpio_cfg.pin_bit_mask = GPIO_SEL_15;
-	ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
+	//gpio_cfg.pin_bit_mask = GPIO_SEL_17;
+	//ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
 
 
 	int cnt=0;
@@ -167,12 +169,12 @@ static void mqtt_app_start(void)
 
     	if(cnt){
 			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,0) );
-			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_15,1) );
+			//ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_17,1) );
 			cnt = 0;
     	}
 		else{
 			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,1) );
-			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_15,0) );
+			//ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_17,0) );
 			cnt = 1;
 		}
 	}
@@ -183,6 +185,24 @@ static void mqtt_app_start(void)
 
 }
 
+void DHT_task(void *pvParameter)
+{
+	portMUX_TYPE mutex;
+	mutex.owner = portMUX_FREE_VAL;
+	mutex.count = 0;
+
+	setDHTPin(17);
+	printf("Starting DHT measurement!\n");
+	while(1)
+	{
+		vTaskEnterCritical(&mutex);
+		printf("Temperature reading %d\n",getTemp());
+		vTaskExitCritical(&mutex);
+		//printf("F temperature is %d\n", getFtemp());
+		//printf("Humidity reading %d\n",getHumidity());
+		vTaskDelay(5000 / portTICK_RATE_MS);
+	}
+}
 
 void app_main()
 {
@@ -200,6 +220,11 @@ void app_main()
 
 
 
-	mqtt_app_start();
+
+
+	vTaskDelay( 5000 / portTICK_RATE_MS );
+	xTaskCreate( &DHT_task, "DHT_task", 2048, NULL, 5, NULL );
+
+	//mqtt_app_start();
 
 }
