@@ -145,6 +145,10 @@ static void mqtt_app_start(void)
 
 
 
+    dht11_setPin(GPIO_NUM_17);
+	printf("Starting DHT measurement!\n");
+	dht11_data_t sensor_data;
+
 
 
     gpio_config_t gpio_cfg = {
@@ -156,8 +160,17 @@ static void mqtt_app_start(void)
 	};
 	ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
 
-	//gpio_cfg.pin_bit_mask = GPIO_SEL_17;
-	//ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
+	gpio_config_t gpio_cfg2 = {
+		.pin_bit_mask = GPIO_SEL_21,
+		.mode = GPIO_MODE_INPUT,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE
+	};
+	ESP_ERROR_CHECK( gpio_config(&gpio_cfg2) );
+
+
+
 
 
 	int cnt=0;
@@ -165,7 +178,24 @@ static void mqtt_app_start(void)
     	vTaskDelay(5000 / portTICK_PERIOD_MS);
 
 		printf("%s\n","posilam teplotu");
-    	esp_mqtt_client_publish(client, "home/room/temp", "20", 2, 0, 0);
+    	esp_mqtt_client_publish(client, "home/room/test", "20", 2, 0, 0);
+
+    	char tmp[10];
+    	int len;
+		dht11_errorHandle( dht11_getData(&sensor_data) );
+
+		len = sprintf(tmp, "%d", sensor_data.temperature);
+		esp_mqtt_client_publish(client, "home/room/temp", tmp, len, 0, 0);
+
+		len = sprintf(tmp, "%d", sensor_data.humidity);
+		esp_mqtt_client_publish(client, "home/room/hum", tmp, len, 0, 0);
+
+		printf("Temp: %d°C\n", sensor_data.temperature );
+		printf("Hum:  %d%%\n", sensor_data.humidity );
+
+
+		printf("Motion: %d\n",gpio_get_level(GPIO_NUM_21) );
+
 
     	if(cnt){
 			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,0) );
@@ -187,15 +217,12 @@ static void mqtt_app_start(void)
 
 void DHT_task(void *pvParameter)
 {
-
 	dht11_setPin(GPIO_NUM_17);
 	printf("Starting DHT measurement!\n");
 
-
 	dht11_data_t sensor_data;
 
-	while(1)
-	{
+	while(1){
 		dht11_errorHandle( dht11_getData(&sensor_data) );
 
 		printf("Temp: %d°C\n", sensor_data.temperature );
@@ -224,7 +251,7 @@ void app_main()
 
 
 	vTaskDelay( 5000 / portTICK_RATE_MS );
-	xTaskCreate( &DHT_task, "DHT_task", 2048, NULL, 5, NULL );
+	//xTaskCreate( &DHT_task, "DHT_task", 2048, NULL, 5, NULL );
 
 	mqtt_app_start();
 
