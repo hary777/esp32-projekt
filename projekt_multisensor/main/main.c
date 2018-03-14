@@ -187,20 +187,21 @@ static void mqtt_app_start(void)
 
 void DHT_task(void *pvParameter)
 {
-	portMUX_TYPE mutex;
-	mutex.owner = portMUX_FREE_VAL;
-	mutex.count = 0;
 
-	setDHTPin(17);
+	dht11_setPin(GPIO_NUM_17);
 	printf("Starting DHT measurement!\n");
+
+
+	dht11_data_t sensor_data;
+
 	while(1)
 	{
-		vTaskEnterCritical(&mutex);
-		printf("Temperature reading %d\n",getTemp());
-		vTaskExitCritical(&mutex);
-		//printf("F temperature is %d\n", getFtemp());
-		//printf("Humidity reading %d\n",getHumidity());
-		vTaskDelay(5000 / portTICK_RATE_MS);
+		dht11_errorHandle( dht11_getData(&sensor_data) );
+
+		printf("Temp: %d°C\n", sensor_data.temperature );
+		printf("Hum:  %d%%\n", sensor_data.humidity );
+
+		vTaskDelay(3000 / portTICK_RATE_MS);
 	}
 }
 
@@ -225,6 +226,6 @@ void app_main()
 	vTaskDelay( 5000 / portTICK_RATE_MS );
 	xTaskCreate( &DHT_task, "DHT_task", 2048, NULL, 5, NULL );
 
-	//mqtt_app_start();
+	mqtt_app_start();
 
 }
