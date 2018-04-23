@@ -13,9 +13,11 @@
 ## Setup
 
 Tested on Ubuntu 16.04.
+
+
+```
 sudo apt-get install gcc git wget make libncurses-dev flex bison gperf python python-serial
-
-
+```
 
 
 
