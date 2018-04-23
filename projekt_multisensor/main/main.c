@@ -136,7 +136,7 @@ static void mqtt_app_start(void)
 {
     const esp_mqtt_client_config_t mqtt_cfg = {
         //.uri = "mqtt://iot.eclipse.org",
-        .host = "192.168.88.7",
+        .host = "10.42.0.1",
         .event_handle = mqtt_event_handler,
     };
 
@@ -178,10 +178,11 @@ static void mqtt_app_start(void)
     	vTaskDelay(5000 / portTICK_PERIOD_MS);
 
 		printf("%s\n","posilam teplotu");
-    	esp_mqtt_client_publish(client, "home/room/test", "20", 2, 0, 0);
+		esp_mqtt_client_publish(client, "home/room/test", "20", 2, 0, 0);
 
-    	char tmp[10];
-    	int len;
+		//DHT11
+		char tmp[10];
+		int len;
 		dht11_errorHandle( dht11_getData(&sensor_data) );
 
 		len = sprintf(tmp, "%d", sensor_data.temperature);
@@ -193,10 +194,13 @@ static void mqtt_app_start(void)
 		printf("Temp: %d°C\n", sensor_data.temperature );
 		printf("Hum:  %d%%\n", sensor_data.humidity );
 
+		//motion sensor
+		int motion_sensor = gpio_get_level(GPIO_NUM_21);
+		len = sprintf(tmp, "%d", motion_sensor);
+		esp_mqtt_client_publish(client, "home/room/motion", tmp, len, 0, 0);
+		printf("Motion: %d\n",motion_sensor );
 
-		printf("Motion: %d\n",gpio_get_level(GPIO_NUM_21) );
-
-
+		//blue LED blink
     	if(cnt){
 			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,0) );
 			//ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_17,1) );
@@ -207,8 +211,17 @@ static void mqtt_app_start(void)
 			//ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_17,0) );
 			cnt = 1;
 		}
-	}
 
+
+
+		//printf("%s\n","Start deep sleep.");
+		//esp_deep_sleep(10000000);
+
+//		esp_wifi_stop();
+//		vTaskDelay(5000 / portTICK_PERIOD_MS);
+//		esp_wifi_start();
+
+	}
 
 
 
