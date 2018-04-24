@@ -28,6 +28,11 @@
 #define WIFI_SSID "badwifi"
 #define WIFI_PASS "hesloheslo999"
 
+#define MQTT_BROOKER_IP	"192.168.88.7"//"10.42.0.1"
+#define DHT11_IN_NUM		GPIO_NUM_17
+#define MOTION_IN_SEL		GPIO_SEL_21
+
+
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t wifi_event_group;
 
@@ -132,42 +137,21 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
     return ESP_OK;
 }
 
-static void mqtt_app_start(void)
+static void multisensor_app_start(void* pvParameter)
 {
     const esp_mqtt_client_config_t mqtt_cfg = {
         //.uri = "mqtt://iot.eclipse.org",
-        .host = "10.42.0.1",
+        .host = MQTT_BROOKER_IP,
         .event_handle = mqtt_event_handler,
     };
-
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_start(client);
 
 
-
-    dht11_setPin(GPIO_NUM_17);
+    dht11_setPin(DHT11_IN_NUM);
 	printf("Starting DHT measurement!\n");
 	dht11_data_t sensor_data;
 
-
-
-    gpio_config_t gpio_cfg = {
-		.pin_bit_mask = GPIO_SEL_16,
-		.mode = GPIO_MODE_OUTPUT,
-		.pull_up_en = GPIO_PULLUP_DISABLE,
-		.pull_down_en = GPIO_PULLDOWN_DISABLE,
-		.intr_type = GPIO_INTR_DISABLE
-	};
-	ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
-
-	gpio_config_t gpio_cfg2 = {
-		.pin_bit_mask = GPIO_SEL_21,
-		.mode = GPIO_MODE_INPUT,
-		.pull_up_en = GPIO_PULLUP_DISABLE,
-		.pull_down_en = GPIO_PULLDOWN_DISABLE,
-		.intr_type = GPIO_INTR_DISABLE
-	};
-	ESP_ERROR_CHECK( gpio_config(&gpio_cfg2) );
 
 
 
@@ -200,17 +184,7 @@ static void mqtt_app_start(void)
 		esp_mqtt_client_publish(client, "home/room/motion", tmp, len, 0, 0);
 		printf("Motion: %d\n",motion_sensor );
 
-		//blue LED blink
-    	if(cnt){
-			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,0) );
-			//ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_17,1) );
-			cnt = 0;
-    	}
-		else{
-			ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,1) );
-			//ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_17,0) );
-			cnt = 1;
-		}
+
 
 
 
@@ -245,11 +219,20 @@ void DHT_task(void *pvParameter)
 	}
 }
 
+static void ledscan(void* pvParameter)
+{
+	while(1){
+		int motion_sensor = gpio_get_level(GPIO_NUM_21);
+		gpio_set_level(GPIO_NUM_16, motion_sensor);
+	}
+}
+
+
 void app_main()
 {
 	nvs_flash_init();
 	initialise_wifi();
-	//xTaskCreate(&http_get_task, "http_get_task", 2048, NULL, 5, NULL);
+
 	ESP_LOGI(TAG, "Starting again!");
 
 	esp_log_level_set("*", ESP_LOG_INFO);
@@ -259,13 +242,67 @@ void app_main()
 	esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
 	esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
 
+	//set blue led pin
+	gpio_config_t gpio_cfg = {
+		.pin_bit_mask = GPIO_SEL_16,
+		.mode = GPIO_MODE_OUTPUT,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE
+	};
+	ESP_ERROR_CHECK( gpio_config(&gpio_cfg) );
+	ESP_ERROR_CHECK( gpio_set_level(GPIO_NUM_16,0) ); //on
+
+	//set motion sensor pin
+	gpio_config_t gpio_cfg2 = {
+		.pin_bit_mask = MOTION_IN_SEL,
+		.mode = GPIO_MODE_INPUT,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE
+	};
+	ESP_ERROR_CHECK( gpio_config(&gpio_cfg2) );
+
+
+
+//	while(1){
+//		int motion_sensor = gpio_get_level(GPIO_NUM_21);
+//		gpio_set_level(GPIO_NUM_16, motion_sensor);
+//	}
+//
+//
+//
+//	vTaskDelay( 5000 / portTICK_RATE_MS );
+//
+//	printf("%s\n","SETUP AND START DEEP SLEEP");
+//	esp_sleep_enable_ext1_wakeup(GPIO_SEL_12, ESP_EXT1_WAKEUP_ANY_HIGH);
+//	esp_deep_sleep_start();
+//
+//
+//	while(1){
+//		printf("%s\n","WAIT.");
+//		vTaskDelay( 60000 / portTICK_RATE_MS );
+//	}
+//
+//
+//
+//	vTaskDelay(5000 / portTICK_PERIOD_MS);
+//	printf("%s\n","Stop wifi.");
+//	esp_wifi_stop();
+//	printf("%s\n","Start deep sleep.");
+//	esp_deep_sleep(10000000);
 
 
 
 
-	vTaskDelay( 5000 / portTICK_RATE_MS );
+
+
+
+	xTaskCreate( &ledscan, "LEDSCAN", 1024, NULL, 5, NULL );
+	xTaskCreate( &multisensor_app_start, "MULTISENSOR_APP", 65535, NULL, 5, NULL );
 	//xTaskCreate( &DHT_task, "DHT_task", 2048, NULL, 5, NULL );
+	//xTaskCreate(&http_get_task, "http_get_task", 2048, NULL, 5, NULL);
 
-	mqtt_app_start();
+	//mqtt_app_start();
 
 }
