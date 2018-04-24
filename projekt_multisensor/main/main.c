@@ -30,7 +30,10 @@
 
 #define MQTT_BROOKER_IP	"192.168.88.7"//"10.42.0.1"
 #define DHT11_IN_NUM		GPIO_NUM_17
-#define MOTION_IN_SEL		GPIO_SEL_21
+#define MOTION_IN_SEL		GPIO_SEL_12
+#define MOTION_IN_NUM		GPIO_NUM_12
+
+#define WAKEUP_TIMER_US		60000000
 
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
@@ -50,7 +53,7 @@ static esp_mqtt_client_handle_t mqtt_client_handle = NULL;
 
 //declarations
 static void init_mqtt_client(void);
-
+static void multisensor_app(void* pvParameter);
 
 
 
@@ -68,7 +71,9 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		/* This is a workaround as ESP32 WiFi libs don't currently
 			auto-reassociate. */
-		esp_wifi_connect();
+
+		//not reasociate in this small time
+		//esp_wifi_connect();
 		xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
 		break;
 	default:
@@ -105,6 +110,8 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
 	switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+            //start task after connect
+            xTaskCreate( &multisensor_app, "MULTISENSOR_APP", 65535, NULL, 5, NULL );
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -145,102 +152,85 @@ static void init_mqtt_client(void)
 	}
 }
 
-static void multisensor_app_start(void* pvParameter)
+static void multisensor_app_sendtemp(void)
 {
-
-
-
-    dht11_setPin(DHT11_IN_NUM);
-	printf("Starting DHT measurement!\n");
 	dht11_data_t sensor_data;
+	char tmp[10];
+	int len;
+	dht11_errorHandle( dht11_getData(&sensor_data) );
+
+	len = sprintf(tmp, "%d", sensor_data.temperature);
+	esp_mqtt_client_publish(mqtt_client_handle, "home/room/temp", tmp, len, 0, 0);
+
+	len = sprintf(tmp, "%d", sensor_data.humidity);
+	esp_mqtt_client_publish(mqtt_client_handle, "home/room/hum", tmp, len, 0, 0);
+
+	printf("Temp: %d°C\n", sensor_data.temperature );
+	printf("Hum:  %d%%\n", sensor_data.humidity );
+}
+
+static void multisensor_app(void* pvParameter)
+{
+	ESP_LOGI(TAG, "MULTISENSOR_APP_TASK_START");
+
+	char tmp[3];
+	int len;
+	int motion_sensor;
+	esp_sleep_wakeup_cause_t reason = esp_sleep_get_wakeup_cause();
 
 
 
 
+	if(reason == ESP_SLEEP_WAKEUP_EXT1){
+		do{
+			//send temp and humidity
+			multisensor_app_sendtemp();
 
+			//send motion 1 for 5 sec
+			esp_mqtt_client_publish(mqtt_client_handle, "home/room/motion", "1", 1, 0, 0);
+			vTaskDelay(5000 / portTICK_PERIOD_MS);
 
-	int cnt=0;
-    while(1){
-    	vTaskDelay(5000 / portTICK_PERIOD_MS);
+			motion_sensor = gpio_get_level(MOTION_IN_NUM);
+		}
+		while(motion_sensor);
+	}
 
-		printf("%s\n","posilam teplotu");
-		esp_mqtt_client_publish(mqtt_client_handle, "home/room/test", "20", 2, 0, 0);
+	else{
+		//timer wake up or other reason, on start and any not usual state
 
-		//DHT11
-		char tmp[10];
-		int len;
-		dht11_errorHandle( dht11_getData(&sensor_data) );
+		//send temp and humidity
+		multisensor_app_sendtemp();
 
-		len = sprintf(tmp, "%d", sensor_data.temperature);
-		esp_mqtt_client_publish(mqtt_client_handle, "home/room/temp", tmp, len, 0, 0);
-
-		len = sprintf(tmp, "%d", sensor_data.humidity);
-		esp_mqtt_client_publish(mqtt_client_handle, "home/room/hum", tmp, len, 0, 0);
-
-		printf("Temp: %d°C\n", sensor_data.temperature );
-		printf("Hum:  %d%%\n", sensor_data.humidity );
-
-		//motion sensor
-		int motion_sensor = gpio_get_level(GPIO_NUM_21);
+		//check motion, might be 0
+		motion_sensor = gpio_get_level(MOTION_IN_NUM);
 		len = sprintf(tmp, "%d", motion_sensor);
 		esp_mqtt_client_publish(mqtt_client_handle, "home/room/motion", tmp, len, 0, 0);
-		printf("Motion: %d\n",motion_sensor );
-
-
-
-
-
-		//printf("%s\n","Start deep sleep.");
-		//esp_deep_sleep(10000000);
-
-//		esp_wifi_stop();
-//		vTaskDelay(5000 / portTICK_PERIOD_MS);
-//		esp_wifi_start();
-
 	}
 
 
 
+	//stop mqtt
+	//esp_mqtt_client_stop(mqtt_client_handle);
+	esp_mqtt_client_destroy(mqtt_client_handle);
 
-}
 
-void DHT_task(void *pvParameter)
-{
-	dht11_setPin(GPIO_NUM_17);
-	printf("Starting DHT measurement!\n");
+	//stop wifi
+	esp_wifi_stop();
 
-	dht11_data_t sensor_data;
+	//set timer
+	esp_sleep_enable_timer_wakeup(WAKEUP_TIMER_US);
 
-	while(1){
-		dht11_errorHandle( dht11_getData(&sensor_data) );
+	//set wake interupt
+	esp_sleep_enable_ext1_wakeup(MOTION_IN_SEL, ESP_EXT1_WAKEUP_ANY_HIGH);
 
-		printf("Temp: %d°C\n", sensor_data.temperature );
-		printf("Hum:  %d%%\n", sensor_data.humidity );
+	//go sleep
+	esp_deep_sleep_start();
 
-		vTaskDelay(3000 / portTICK_RATE_MS);
-	}
-}
-
-static void ledscan(void* pvParameter)
-{
-	while(1){
-		int motion_sensor = gpio_get_level(GPIO_NUM_21);
-		gpio_set_level(GPIO_NUM_16, motion_sensor);
-	}
 }
 
 
 void app_main()
 {
-	//init nvs memory for wifi
-	nvs_flash_init();
-
-	//init MQTT client
-	init_mqtt_client();
-
-	//init and start wifi
-	initialise_wifi();
-
 	ESP_LOGI(TAG, "Starting again!");
 
 	esp_log_level_set("*", ESP_LOG_INFO);
@@ -270,6 +260,19 @@ void app_main()
 		.intr_type = GPIO_INTR_DISABLE
 	};
 	ESP_ERROR_CHECK( gpio_config(&gpio_cfg2) );
+
+	//set DHT11 pin
+    dht11_setPin(DHT11_IN_NUM);
+
+
+    //init nvs memory for wifi
+	nvs_flash_init();
+
+	//init MQTT client
+	init_mqtt_client();
+
+	//init and start wifi
+	initialise_wifi();
 
 
 
@@ -306,8 +309,8 @@ void app_main()
 
 
 
-	xTaskCreate( &ledscan, "LEDSCAN", 1024, NULL, 5, NULL );
-	xTaskCreate( &multisensor_app_start, "MULTISENSOR_APP", 65535, NULL, 5, NULL );
+	//xTaskCreate( &ledscan, "LEDSCAN", 1024, NULL, 5, NULL );
+	//xTaskCreate( &multisensor_app, "MULTISENSOR_APP", 65535, NULL, 5, NULL );
 	//xTaskCreate( &DHT_task, "DHT_task", 2048, NULL, 5, NULL );
 	//xTaskCreate(&http_get_task, "http_get_task", 2048, NULL, 5, NULL);
 

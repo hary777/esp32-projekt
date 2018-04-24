@@ -34,6 +34,17 @@ This compile app, flash to ESP32 device and launch serial monitor.
 Wifi setup is in macros in file `main.c` and IP or DNS of MQTT broker.
 
 
+##Wire connection
+
+ESP32 
+
+
+
+
+
+
+
+
 
 
 
