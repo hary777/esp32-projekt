@@ -41,8 +41,16 @@ static EventGroupHandle_t wifi_event_group;
    to the AP with an IP? */
 const int CONNECTED_BIT = BIT0;
 
-
+//message TAG
 static const char *TAG = "projekt_multisensor";
+
+//MQTT client handle global var
+static esp_mqtt_client_handle_t mqtt_client_handle = NULL;
+
+
+//declarations
+static void init_mqtt_client(void);
+
 
 
 
@@ -54,6 +62,8 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
 		break;
 	case SYSTEM_EVENT_STA_GOT_IP:
 		xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+		ESP_LOGI(TAG, "WIFI_GOT_IP_EVENT, Start MQTT client");
+		init_mqtt_client();
 		break;
 	case SYSTEM_EVENT_STA_DISCONNECTED:
 		/* This is a workaround as ESP32 WiFi libs don't currently
@@ -92,32 +102,15 @@ static void initialise_wifi(void)
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
 {
-    esp_mqtt_client_handle_t client = event->client;
-    int msg_id;
-
-    switch (event->event_id) {
+	switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
-            ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
             break;
-
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
-            ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_UNSUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
@@ -137,15 +130,24 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
     return ESP_OK;
 }
 
+static void init_mqtt_client(void)
+{
+	if(mqtt_client_handle == NULL){
+		const esp_mqtt_client_config_t mqtt_cfg = {
+			//.uri = "mqtt://iot.eclipse.org",
+			.host = MQTT_BROOKER_IP,
+			.event_handle = mqtt_event_handler,
+		};
+		mqtt_client_handle = esp_mqtt_client_init(&mqtt_cfg);
+	}
+	else{
+		esp_mqtt_client_start(mqtt_client_handle);
+	}
+}
+
 static void multisensor_app_start(void* pvParameter)
 {
-    const esp_mqtt_client_config_t mqtt_cfg = {
-        //.uri = "mqtt://iot.eclipse.org",
-        .host = MQTT_BROOKER_IP,
-        .event_handle = mqtt_event_handler,
-    };
-    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_start(client);
+
 
 
     dht11_setPin(DHT11_IN_NUM);
@@ -162,7 +164,7 @@ static void multisensor_app_start(void* pvParameter)
     	vTaskDelay(5000 / portTICK_PERIOD_MS);
 
 		printf("%s\n","posilam teplotu");
-		esp_mqtt_client_publish(client, "home/room/test", "20", 2, 0, 0);
+		esp_mqtt_client_publish(mqtt_client_handle, "home/room/test", "20", 2, 0, 0);
 
 		//DHT11
 		char tmp[10];
@@ -170,10 +172,10 @@ static void multisensor_app_start(void* pvParameter)
 		dht11_errorHandle( dht11_getData(&sensor_data) );
 
 		len = sprintf(tmp, "%d", sensor_data.temperature);
-		esp_mqtt_client_publish(client, "home/room/temp", tmp, len, 0, 0);
+		esp_mqtt_client_publish(mqtt_client_handle, "home/room/temp", tmp, len, 0, 0);
 
 		len = sprintf(tmp, "%d", sensor_data.humidity);
-		esp_mqtt_client_publish(client, "home/room/hum", tmp, len, 0, 0);
+		esp_mqtt_client_publish(mqtt_client_handle, "home/room/hum", tmp, len, 0, 0);
 
 		printf("Temp: %d°C\n", sensor_data.temperature );
 		printf("Hum:  %d%%\n", sensor_data.humidity );
@@ -181,7 +183,7 @@ static void multisensor_app_start(void* pvParameter)
 		//motion sensor
 		int motion_sensor = gpio_get_level(GPIO_NUM_21);
 		len = sprintf(tmp, "%d", motion_sensor);
-		esp_mqtt_client_publish(client, "home/room/motion", tmp, len, 0, 0);
+		esp_mqtt_client_publish(mqtt_client_handle, "home/room/motion", tmp, len, 0, 0);
 		printf("Motion: %d\n",motion_sensor );
 
 
@@ -230,7 +232,13 @@ static void ledscan(void* pvParameter)
 
 void app_main()
 {
+	//init nvs memory for wifi
 	nvs_flash_init();
+
+	//init MQTT client
+	init_mqtt_client();
+
+	//init and start wifi
 	initialise_wifi();
 
 	ESP_LOGI(TAG, "Starting again!");
