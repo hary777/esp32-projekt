@@ -36,15 +36,15 @@ Wifi setup is in macros in file `main.c` and IP or DNS of MQTT broker.
 
 ##Wire connection
 ```
-ESP32bat	-	DHT11(4pins)
-5V				VDD(pin1)
-GND				GND(pin4)
-GPIO17			DATA(pin2)
+ESP32bat - DHT11(4pins)
+5V         VDD(pin1)
+GND        GND(pin4)
+GPIO17     DATA(pin2)
 
-ESP32bat	-	PIR AS312
-VCC(3.3V)		+VSS
-GND				-GND
-GPIO12			OUT
+ESP32bat - PIR AS312
+VCC(3.3V)  +VSS
+GND        -GND
+GPIO12     OUT
 ```
 
 Motion sensor must be conected to GPIO muxed with RTCIO. RTCIO is used for wakeup.
