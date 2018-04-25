@@ -33,6 +33,7 @@
 #define MOTION_IN_SEL		GPIO_SEL_12
 #define MOTION_IN_NUM		GPIO_NUM_12
 
+//wakeup time in us
 #define WAKEUP_TIMER_US		60000000
 
 
@@ -179,8 +180,6 @@ static void multisensor_app(void* pvParameter)
 	esp_sleep_wakeup_cause_t reason = esp_sleep_get_wakeup_cause();
 
 
-
-
 	if(reason == ESP_SLEEP_WAKEUP_EXT1){
 		do{
 			//send temp and humidity
@@ -212,10 +211,10 @@ static void multisensor_app(void* pvParameter)
 
 
 	//stop mqtt
-	esp_mqtt_client_destroy(mqtt_client_handle)
+	esp_mqtt_client_destroy(mqtt_client_handle);
 
-	//wait for TCP FIN-ACK
-	vTaskDelay(100 / portTICK_PERIOD_MS);
+	//wait 500ms for TCP FIN-ACK
+	vTaskDelay(500 / portTICK_PERIOD_MS);
 
 	//stop wifi
 	esp_wifi_disconnect();
