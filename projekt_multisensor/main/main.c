@@ -158,7 +158,15 @@ static void multisensor_app_sendtemp(void)
 	dht11_data_t sensor_data;
 	char tmp[10];
 	int len;
-	dht11_errorHandle( dht11_getData(&sensor_data) );
+	int status;
+	status = dht11_getData(&sensor_data);
+
+	if(status == DHT11_TIMEOUT_ERROR){
+		//wait 100ms
+		vTaskDelay(5000 / portTICK_PERIOD_MS);
+		//next try
+		dht11_errorHandle(dht11_getData(&sensor_data) );
+	}
 
 	len = sprintf(tmp, "%d", sensor_data.temperature);
 	esp_mqtt_client_publish(mqtt_client_handle, "home/room/temp", tmp, len, 0, 0);
