@@ -33,6 +33,8 @@ This compile app, flash to ESP32 device and launch serial monitor.
 
 Wifi setup is in macros in file `main.c` and IP or DNS of MQTT broker.
 
+Useful commands `make app` build app, `make flash` build and flash to esp,
+`make monitor` run serial monitor. Monitor terminate CTRL+]
 
 ## Wire connection
 ```
@@ -56,7 +58,9 @@ Set GPIO pins, run wifi, ater wifi get IP run MQTT, after MQTT connected start m
 Multisensor task test wakeup source, if source is timer specified in `WAKEUP_TIMER_US`
 then send temperature humidity and motion for sure and go sleep. If source is EXT1(motion sensor)
 then send motion on, wait 5 second, if sensor still on then still wait and send 
-temperature and humidity. After motion sensor off then go sleep.
+temperature and humidity. After motion sensor off then go sleep. Blue LED is on when esp running.
+
+
 
 
 
