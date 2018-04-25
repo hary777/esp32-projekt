@@ -28,7 +28,7 @@
 #define WIFI_SSID "badwifi"
 #define WIFI_PASS "hesloheslo999"
 
-#define MQTT_BROOKER_IP	"192.168.88.7"//"10.42.0.1"
+#define MQTT_BROOKER_IP		"10.42.0.1"//"192.168.88.7"
 #define DHT11_IN_NUM		GPIO_NUM_17
 #define MOTION_IN_SEL		GPIO_SEL_12
 #define MOTION_IN_NUM		GPIO_NUM_12
@@ -193,6 +193,8 @@ static void multisensor_app(void* pvParameter)
 			motion_sensor = gpio_get_level(MOTION_IN_NUM);
 		}
 		while(motion_sensor);
+		//motion 0
+		esp_mqtt_client_publish(mqtt_client_handle, "home/room/motion", "0", 1, 0, 0);
 	}
 
 	else{
@@ -210,11 +212,13 @@ static void multisensor_app(void* pvParameter)
 
 
 	//stop mqtt
-	//esp_mqtt_client_stop(mqtt_client_handle);
-	esp_mqtt_client_destroy(mqtt_client_handle);
+	esp_mqtt_client_destroy(mqtt_client_handle)
 
+	//wait for TCP FIN-ACK
+	vTaskDelay(100 / portTICK_PERIOD_MS);
 
 	//stop wifi
+	esp_wifi_disconnect();
 	esp_wifi_stop();
 
 	//set timer
@@ -273,47 +277,5 @@ void app_main()
 
 	//init and start wifi
 	initialise_wifi();
-
-
-
-//	while(1){
-//		int motion_sensor = gpio_get_level(GPIO_NUM_21);
-//		gpio_set_level(GPIO_NUM_16, motion_sensor);
-//	}
-//
-//
-//
-//	vTaskDelay( 5000 / portTICK_RATE_MS );
-//
-//	printf("%s\n","SETUP AND START DEEP SLEEP");
-//	esp_sleep_enable_ext1_wakeup(GPIO_SEL_12, ESP_EXT1_WAKEUP_ANY_HIGH);
-//	esp_deep_sleep_start();
-//
-//
-//	while(1){
-//		printf("%s\n","WAIT.");
-//		vTaskDelay( 60000 / portTICK_RATE_MS );
-//	}
-//
-//
-//
-//	vTaskDelay(5000 / portTICK_PERIOD_MS);
-//	printf("%s\n","Stop wifi.");
-//	esp_wifi_stop();
-//	printf("%s\n","Start deep sleep.");
-//	esp_deep_sleep(10000000);
-
-
-
-
-
-
-
-	//xTaskCreate( &ledscan, "LEDSCAN", 1024, NULL, 5, NULL );
-	//xTaskCreate( &multisensor_app, "MULTISENSOR_APP", 65535, NULL, 5, NULL );
-	//xTaskCreate( &DHT_task, "DHT_task", 2048, NULL, 5, NULL );
-	//xTaskCreate(&http_get_task, "http_get_task", 2048, NULL, 5, NULL);
-
-	//mqtt_app_start();
 
 }
