@@ -50,7 +50,13 @@ GPIO12     OUT
 Motion sensor must be conected to GPIO muxed with RTCIO. RTCIO is used for wakeup.
 
 
+## Program
 
+Set GPIO pins, run wifi, ater wifi get IP run MQTT, after MQTT connected start multisensor task.
+Multisensor task test wakeup source, if source is timer specified in `WAKEUP_TIMER_US`
+then send temperature humidity and motion for sure and go sleep. If source is EXT1(motion sensor)
+then send motion on, wait 5 second, if sensor still on then still wait and send 
+temperature and humidity. After motion sensor off then go sleep.
 
 
 
